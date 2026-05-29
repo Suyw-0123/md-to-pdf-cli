@@ -1,5 +1,5 @@
 [project]
-name = "markdown-to-pdf"
+name = "md-to-pdf-cli"
 version = "0.1.0"
 description = "Convert local Markdown files to PDF via headless Chromium (CJK-friendly, mermaid + math + code highlighting)."
 readme = "README.md"
