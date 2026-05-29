@@ -1,0 +1,66 @@
+[project]
+name = "markdown-to-pdf"
+version = "0.1.0"
+description = "Convert local Markdown files to PDF via headless Chromium (CJK-friendly, mermaid + math + code highlighting)."
+readme = "README.md"
+authors = [
+    { name = "suyw", email = "su.willie.gm@gmail.com" }
+]
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["markdown", "pdf", "cli", "chromium", "playwright", "cjk", "mermaid", "katex"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Text Processing :: Markup :: Markdown",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "jinja2>=3.1.6",
+    "markdown-it-py>=4.2.0",
+    "mdit-py-plugins>=0.6.1",
+    "playwright>=1.60.0",
+    "pygments>=2.20.0",
+    "typer>=0.26.3",
+]
+
+[project.scripts]
+md2pdf = "md2pdf.cli:app"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = [
+    # CLI option declarations and a few wrapped strings exceed the line length
+    # on purpose; formatting them shorter hurts readability.
+    "E501",
+    # Typer requires calling typer.Option()/Argument() in parameter defaults;
+    # this is the framework's intended pattern, not a bug.
+    "B008",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: end-to-end tests that launch Chromium (deselect with -m 'not slow')",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.11,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Distribution name is "markdown-to-pdf" but the import package is "md2pdf".
+module-name = "md2pdf"
+
+[dependency-groups]
+dev = [
+    "pypdf>=6.12.2",
+    "pytest>=9.0.3",
+    "ruff>=0.15.15",
+]

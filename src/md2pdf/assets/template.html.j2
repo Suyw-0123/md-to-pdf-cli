@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+{% if math %}<style>{{ katex_css }}</style>{% endif %}
+<style>{{ pygments_css }}</style>
+<style>{{ theme_css }}</style>
+<style>:root { --md2pdf-font: {{ font_family }}; }</style>
+{% if extra_css %}<style>{{ extra_css }}</style>{% endif %}
+</head>
+<body>
+{% if toc_html %}{{ toc_html }}{% endif %}
+<main class="md2pdf-content">
+{{ body }}
+</main>
+
+{% if math %}
+<script>{{ katex_js }}</script>
+<script>{{ katex_autorender_js }}</script>
+{% endif %}
+{% if mermaid %}
+<script>{{ mermaid_js }}</script>
+{% endif %}
+<script>
+window.__md2pdf_ready = false;
+(async () => {
+  try {
+    if ({{ 'true' if math else 'false' }} && window.renderMathInElement) {
+      window.renderMathInElement(document.body, {
+        delimiters: [
+          {left: "\\[", right: "\\]", display: true},
+          {left: "\\(", right: "\\)", display: false},
+          {left: "$$", right: "$$", display: true},
+          {left: "$", right: "$", display: false}
+        ],
+        throwOnError: false
+      });
+    }
+  } catch (e) { console.error("md2pdf: KaTeX error", e); }
+  try {
+    if ({{ 'true' if mermaid else 'false' }} && window.mermaid) {
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+      const nodes = document.querySelectorAll("pre.mermaid");
+      if (nodes.length) { await window.mermaid.run({ nodes }); }
+    }
+  } catch (e) { console.error("md2pdf: mermaid error", e); }
+  try {
+    if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+  } catch (e) { /* ignore */ }
+  window.__md2pdf_ready = true;
+})();
+</script>
+</body>
+</html>

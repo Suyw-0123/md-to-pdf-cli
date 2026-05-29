@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# uv / virtualenv
+.venv/
+
+# Generated output
+*.pdf
+
+# AI assistant
+.claude/
+.codex/
