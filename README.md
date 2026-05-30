@@ -2,6 +2,8 @@
 
 Convert local Markdown files to **PDF** using headless Chromium
 
+![installation](installation.png)
+
 ## Install
 
 Requires Python 3.12+.
