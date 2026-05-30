@@ -2,7 +2,7 @@
 name = "md-to-pdf-cli"
 version = "0.1.1"
 description = "Convert local Markdown files to PDF via headless Chromium (CJK-friendly, mermaid + math + code highlighting)."
-readme = "README.md"
+readme = "README.pypi.md"
 authors = [
     { name = "suyw", email = "su.willie.gm@gmail.com" }
 ]
@@ -28,6 +28,12 @@ dependencies = [
 
 [project.scripts]
 md2pdf = "md2pdf.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Suyw-0123/md-to-pdf-cli"
+Repository = "https://github.com/Suyw-0123/md-to-pdf-cli"
+Documentation = "https://github.com/Suyw-0123/md-to-pdf-cli/tree/main/docs/wiki"
+Issues = "https://github.com/Suyw-0123/md-to-pdf-cli/issues"
 
 [tool.ruff]
 line-length = 100
