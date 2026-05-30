@@ -26,7 +26,7 @@ _INSTALL_HINT = (
     "Install it once with:\n"
     "    playwright install chromium\n"
     "If you installed md2pdf as a uv tool:\n"
-    "    uv tool run --from markdown-to-pdf playwright install chromium"
+    "    uv tool run --from md-to-pdf-cli playwright install chromium"
 )
 
 
