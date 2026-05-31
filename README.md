@@ -21,6 +21,8 @@ playwright install chromium                                    # one-time browse
 Chromium is **not** a pip dependency — it's a browser binary Playwright downloads
 once into a shared cache. If it's missing, `md2pdf` tells you the exact command to run.
 
+> **TODO**: Automatically download Chromium on the first run to remove this manual step.
+
 ## Quick start
 
 ```bash
