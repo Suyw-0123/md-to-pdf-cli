@@ -77,14 +77,25 @@ furniture must go through `display_header_footer` + `header_template` /
 - Templates use Chromium's placeholder classes: `pageNumber`, `totalPages`,
   `title`, `date`, `url`. The default footer is `pageNumber / totalPages`.
 
-## Browser-not-installed handling
+## Browser-not-installed handling (auto-install)
 
-Chromium is not a pip dependency. `_launch_chromium()` (pdf_render.py:37) catches
-the Playwright launch error and, when the message contains `Executable doesn't
-exist` or `playwright install`, raises `BrowserNotInstalledError` carrying the
-`_INSTALL_HINT` text. The CLI prints that hint in yellow instead of a raw
-traceback. The hint uses the published package name, so the uv-tool variant reads
-`uv tool run --from md-to-pdf-cli playwright install chromium`.
+Chromium is not a pip dependency — it's a Playwright browser binary. To make
+`pip install md-to-pdf-cli` "just work", md2pdf downloads it on first use:
+
+`_launch_chromium()` (pdf_render.py) tries `playwright.chromium.launch()`. On
+failure it inspects the error via `_is_missing_browser_error()` (matching
+`Executable doesn't exist` / `playwright install`); unrelated errors re-raise
+unchanged. For a genuine missing-browser error it calls `_install_chromium()`,
+which runs `python -m playwright install chromium` against the current
+interpreter (`sys.executable`) so it works the same under pip, uv, or pipx — the
+binary lands in Playwright's shared per-user cache, so this downloads only once.
+It then retries the launch.
+
+Auto-install can be disabled by setting `MD2PDF_AUTO_INSTALL_BROWSER=0` (handy in
+CI). When auto-install is off or the download fails, `BrowserNotInstalledError`
+is raised carrying `_INSTALL_HINT`, and the CLI prints that hint in yellow instead
+of a raw traceback. The hint uses the published package name, so the uv-tool
+variant reads `uv tool run --from md-to-pdf-cli playwright install chromium`.
 
 ## Lifecycle
 

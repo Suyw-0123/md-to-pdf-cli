@@ -69,6 +69,30 @@ Where B904 ("raise from") applies, use `raise typer.Exit(code=1) from exc`.
   (OIDC)** — no token. Needs `permissions: id-token: write`. Uses
   `--check-url https://pypi.org/simple/md-to-pdf-cli/` so re-runs skip
   already-uploaded files instead of failing.
+- **Docker** (`.github/workflows/docker.yml`): same triggers as Publish. Builds
+  the `Dockerfile` and pushes to `ghcr.io/${{ github.repository }}` (i.e.
+  `ghcr.io/suyw-0123/md-to-pdf-cli`). Tags come from `docker/metadata-action`
+  (`{{version}}`, `{{major}}.{{minor}}`, and `latest` on the default branch).
+  Needs `permissions: packages: write`; auth is the built-in `GITHUB_TOKEN`, no
+  secret to manage. The first pushed image is private — make it public once under
+  the repo's *Packages* settings if you want anonymous `docker pull`.
+
+## Docker image
+
+`Dockerfile` builds a self-contained image: `python:3.12-slim` + CJK fonts
+(`fonts-noto-cjk`) + the CLI installed with `pip install .` + `playwright install
+--with-deps chromium`. The browser is baked in at `PLAYWRIGHT_BROWSERS_PATH=/opt/playwright`
+(world-readable). The image sets two md2pdf env vars: `MD2PDF_AUTO_INSTALL_BROWSER=0`
+(don't download at runtime — it's already here) and `MD2PDF_CHROMIUM_NO_SANDBOX=1`
+(launch Chromium with `--no-sandbox --disable-dev-shm-usage`, required in most
+containers — see [PDF Rendering](PDF-Rendering.md)). `ENTRYPOINT ["md2pdf"]` with
+`WORKDIR /work`, so `docker run -v "$PWD:/work" <image> report.md` converts a
+mounted file. Build/run locally:
+
+```bash
+docker build -t md2pdf .
+docker run --rm -v "$PWD:/work" md2pdf tests/fixtures/sample.md
+```
 
 ## Release flow
 

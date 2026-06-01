@@ -15,6 +15,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.table import Table
 from typer._click.core import Context as ClickContext
 from typer._click.exceptions import UsageError  # vendored; matches TyperGroup
 from typer.core import TyperGroup
@@ -220,16 +221,109 @@ def init(
     """Scaffold a md2pdf.toml and a starter theme.css in DIRECTORY."""
     directory.mkdir(parents=True, exist_ok=True)
     targets = [(directory / "md2pdf.toml", _SAMPLE_TOML), (directory / "theme.css", _SAMPLE_CSS)]
+
     for path, content in targets:
         if path.exists() and not force:
             _console.print(f"[yellow]skip[/yellow] {path} (exists; use --force)")
             continue
         path.write_text(content, encoding="utf-8")
         _console.print(f"[green]✓[/green] wrote {path}")
+    _print_config_help()
+
+
+def _print_config_help() -> None:
+    """Explain md2pdf.toml and walk through every setting as a table."""
     _console.print(
-        "\nNext: install the browser once with [bold]uv run playwright install chromium[/bold], "
-        "then [bold]uv run md2pdf your.md[/bold]."
+        "\n"
+        "[bold]md2pdf.toml[/bold] is auto-loaded from the current directory whenever you run md2pdf. "
+        "\n"
+        "The lookup order is [bold]CLI flags > md2pdf.toml > built-in defaults[/bold],"
+        "\n"
+        "so the file is just a place to make your preferred defaults stick. Every section and "
+        "key is optional — keep what you want to change, delete the rest."
+        "\n"
     )
+
+    table = Table(
+        title="md2pdf.toml settings:",
+        title_style="bold",
+        title_justify="left",
+        header_style="bold",
+        show_lines=True,
+        pad_edge=False,
+    )
+    table.add_column("Section", style="cyan", no_wrap=True)
+    table.add_column("Key", style="green", no_wrap=True)
+    table.add_column("Default", style="dim", no_wrap=True)
+    table.add_column("What it does")
+
+    rows: list[tuple[str, str, str, str]] = [
+        ("[output]", "page_size", "A4", "Paper format passed to Chromium: A4, Letter, Legal, ..."),
+        ("", "landscape", "false", "Rotate the page to landscape orientation."),
+        (
+            "",
+            "margin",
+            "2cm / 1.8cm",
+            "Page margins as an inline table: top, bottom, left, right (any CSS length).",
+        ),
+        (
+            "[theme]",
+            "base",
+            "default",
+            'Named base theme to start from (reserved; only "default" today).',
+        ),
+        (
+            "",
+            "css",
+            "[]",
+            "Extra stylesheets appended after the base theme (later files win). "
+            'Relative paths resolve against the config file; e.g. css = ["theme.css"].',
+        ),
+        (
+            "",
+            "font_family",
+            "CJK-first stack",
+            "CSS font stack for body text. CJK faces are listed first so Chinese/"
+            "Japanese/Korean text renders instead of tofu boxes.",
+        ),
+        (
+            "",
+            "code_style",
+            "default",
+            "Pygments style name used for syntax-highlighted code blocks.",
+        ),
+        ("[features]", "math", "true", "Parse $...$ / $$...$$ and render it with KaTeX."),
+        ("", "mermaid", "true", "Render ```mermaid code fences into diagrams."),
+        ("", "toc", "false", "Prepend a generated table-of-contents page."),
+        (
+            "",
+            "embed_images",
+            "false",
+            "Inline local images as base64 data URIs for a single self-contained PDF.",
+        ),
+        (
+            "[header]\n[footer]",
+            "enabled",
+            "footer: true\nheader: false",
+            "Turn each banner on or off. The footer is on by default, the header off.",
+        ),
+        (
+            "",
+            "template",
+            "—",
+            "Inner HTML for the banner. Placeholders: pageNumber, totalPages, title, date, url.",
+        ),
+    ]
+    for section, key, default, desc in rows:
+        # Escape the leading [ so Rich doesn't treat [output] etc. as markup.
+        section_cell = section.replace("[", r"\[") if section else ""
+        table.add_row(section_cell, key, default, desc)
+
+    _console.print(table)
+
+    _console.print("\n")
+    _console.print("Full reference: [bold]md2pdf --help[/bold] and the Configuration wiki page.")
+    _console.print("\n")
 
 
 if __name__ == "__main__":

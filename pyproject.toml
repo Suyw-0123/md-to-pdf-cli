@@ -1,6 +1,6 @@
 [project]
 name = "md-to-pdf-cli"
-version = "0.1.2"
+version = "0.1.3"
 description = "Convert local Markdown files to PDF via headless Chromium (CJK-friendly, mermaid + math + code highlighting)."
 readme = "README.pypi.md"
 authors = [

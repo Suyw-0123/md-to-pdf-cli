@@ -8,6 +8,9 @@ broken diagrams" class of bugs.
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -21,9 +24,21 @@ _RENDER_TIMEOUT_MS = 30_000
 
 _EMPTY_BANNER = "<span></span>"
 
+#: Set this env var to a falsey value to opt out of the first-run auto-download
+#: (e.g. in CI where you provision the browser yourself).
+_AUTO_INSTALL_ENV = "MD2PDF_AUTO_INSTALL_BROWSER"
+
+#: Set this env var truthy to launch Chromium with ``--no-sandbox`` +
+#: ``--disable-dev-shm-usage``. Required inside most containers (the official
+#: Docker image sets it); leave it unset for normal installs so the browser
+#: keeps its sandbox.
+_NO_SANDBOX_ENV = "MD2PDF_CHROMIUM_NO_SANDBOX"
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
 _INSTALL_HINT = (
-    "Chromium is not installed for Playwright.\n"
-    "Install it once with:\n"
+    "Chromium is not installed for Playwright and the automatic download failed.\n"
+    "Install it manually once with:\n"
     "    playwright install chromium\n"
     "If you installed md2pdf as a uv tool:\n"
     "    uv tool run --from md-to-pdf-cli playwright install chromium"
@@ -31,16 +46,63 @@ _INSTALL_HINT = (
 
 
 class BrowserNotInstalledError(RuntimeError):
-    """Raised when the Chromium browser binary is missing."""
+    """Raised when the Chromium browser binary is missing and can't be installed."""
+
+
+def _is_missing_browser_error(exc: PlaywrightError) -> bool:
+    message = str(exc)
+    return "Executable doesn't exist" in message or "playwright install" in message
+
+
+def _auto_install_enabled() -> bool:
+    return os.environ.get(_AUTO_INSTALL_ENV, "1").strip().lower() not in {"0", "false", "no", ""}
+
+
+def _chromium_launch_args() -> list[str]:
+    if os.environ.get(_NO_SANDBOX_ENV, "").strip().lower() in _TRUTHY:
+        # --disable-dev-shm-usage avoids Chromium crashing on the small /dev/shm
+        # that containers ship with by default.
+        return ["--no-sandbox", "--disable-dev-shm-usage"]
+    return []
+
+
+def _install_chromium() -> bool:
+    """Download the Chromium binary Playwright needs. Returns True on success.
+
+    Runs ``playwright install`` against the *current* interpreter so it works the
+    same whether md2pdf was installed with pip, uv, or pipx — the browser lands
+    in Playwright's shared per-user cache, so this only ever downloads once.
+    """
+    print(
+        "md2pdf: Chromium isn't installed yet — downloading it once "
+        "(~150 MB, this can take a minute)…",
+        file=sys.stderr,
+        flush=True,
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            check=False,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
 
 
 def _launch_chromium(playwright):
+    args = _chromium_launch_args()
     try:
-        return playwright.chromium.launch()
+        return playwright.chromium.launch(args=args)
     except PlaywrightError as exc:
-        if "Executable doesn't exist" in str(exc) or "playwright install" in str(exc):
+        if not _is_missing_browser_error(exc):
+            raise
+        if not _auto_install_enabled() or not _install_chromium():
             raise BrowserNotInstalledError(_INSTALL_HINT) from exc
-        raise
+        # Retry once now that the browser should be present.
+        try:
+            return playwright.chromium.launch(args=args)
+        except PlaywrightError as retry_exc:
+            raise BrowserNotInstalledError(_INSTALL_HINT) from retry_exc
 
 
 def _wrap_banner(inner: str) -> str:

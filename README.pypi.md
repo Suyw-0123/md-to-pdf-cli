@@ -15,15 +15,16 @@ Requires Python 3.12+.
 ```bash
 # with uv (recommended): installs the `md2pdf` command, isolated
 uv tool install md-to-pdf-cli
-uv tool run --from md-to-pdf-cli playwright install chromium   # one-time browser download
 
 # or with pip
 pip install md-to-pdf-cli
-playwright install chromium                                    # one-time browser download
 ```
 
-Chromium is **not** a pip dependency — it's a browser binary Playwright downloads
-once into a shared cache. If it's missing, `md2pdf` tells you the exact command to run.
+That's it. Chromium is **not** a pip dependency — it's a browser binary Playwright
+downloads once into a shared cache. The first time you run `md2pdf` it detects the
+missing browser and downloads it automatically (~150 MB, one time only). To do it
+up front instead, run `playwright install chromium` (or, for a uv-tool install,
+`uv tool run --from md-to-pdf-cli playwright install chromium`).
 
 ## Quick start
 

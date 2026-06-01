@@ -65,6 +65,27 @@ Ruff 設定（`pyproject.toml`）：line length 100、target `py312`、規則 `E
   時，透過 **PyPI Trusted Publishing（OIDC）** 做 `uv build` + `uv publish`——免 token。
   需要 `permissions: id-token: write`。使用
   `--check-url https://pypi.org/simple/md-to-pdf-cli/`，讓重跑時跳過已上傳的檔案而非失敗。
+- **Docker**（`.github/workflows/docker.yml`）：觸發條件同 Publish。建置 `Dockerfile` 並推到
+  `ghcr.io/${{ github.repository }}`（即 `ghcr.io/suyw-0123/md-to-pdf-cli`）。tag 由
+  `docker/metadata-action` 產生（`{{version}}`、`{{major}}.{{minor}}`，預設分支再加 `latest`）。
+  需要 `permissions: packages: write`；認證用內建的 `GITHUB_TOKEN`，免管理 secret。首次推出的
+  image 是 private——若要讓匿名 `docker pull`，到 repo 的 *Packages* 設定改為 public。
+
+## Docker image
+
+`Dockerfile` 建一個自帶一切的 image：`python:3.12-slim` + CJK 字型（`fonts-noto-cjk`）+
+用 `pip install .` 裝好 CLI + `playwright install --with-deps chromium`。瀏覽器在建置時就烤進
+`PLAYWRIGHT_BROWSERS_PATH=/opt/playwright`（全域可讀）。image 設了兩個 md2pdf 環境變數：
+`MD2PDF_AUTO_INSTALL_BROWSER=0`（不要在執行期下載——已經在裡面）與
+`MD2PDF_CHROMIUM_NO_SANDBOX=1`（以 `--no-sandbox --disable-dev-shm-usage` 啟動 Chromium，
+多數容器內必需——見 [PDF Rendering](PDF-Rendering.md)）。`ENTRYPOINT ["md2pdf"]` 搭配
+`WORKDIR /work`，所以 `docker run -v "$PWD:/work" <image> report.md` 就能轉換掛載進來的檔案。
+本機建置／執行：
+
+```bash
+docker build -t md2pdf .
+docker run --rm -v "$PWD:/work" md2pdf tests/fixtures/sample.md
+```
 
 ## 發布流程
 

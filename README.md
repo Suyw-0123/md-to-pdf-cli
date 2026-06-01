@@ -11,15 +11,54 @@ Requires Python 3.12+.
 ```bash
 # with uv (recommended): installs the `md2pdf` command, isolated
 uv tool install md-to-pdf-cli
-uv tool run --from md-to-pdf-cli playwright install chromium   # one-time browser download
 
 # or with pip
 pip install md-to-pdf-cli
-playwright install chromium                                    # one-time browser download
 ```
 
-Chromium is **not** a pip dependency — it's a browser binary Playwright downloads
-once into a shared cache. If it's missing, `md2pdf` tells you the exact command to run.
+That's it. Chromium is **not** a pip dependency — it's a browser binary Playwright
+downloads once into a shared cache. The first time you run `md2pdf` it detects the
+missing browser and downloads it automatically (~150 MB, one time only).
+
+Prefer to do it up front, or running in CI? Trigger the download yourself:
+
+```bash
+playwright install chromium                                    # pip install
+uv tool run --from md-to-pdf-cli playwright install chromium   # uv tool install
+```
+
+To disable the automatic first-run download (e.g. in CI), set
+`MD2PDF_AUTO_INSTALL_BROWSER=0`.
+
+## Run with Docker
+
+No Python, no Chromium, no fonts to install — the image ships the CLI, headless
+Chromium, **and** CJK fonts. Mount your folder at `/work` and the PDF lands next
+to the input:
+
+```bash
+docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli report.md
+docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli report.md -o out/doc.pdf
+docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli init   # scaffold config
+```
+
+The entrypoint is `md2pdf`, so everything after the image name is passed straight
+to the CLI (`--help` works too). Pin a version with a tag, e.g.
+`ghcr.io/suyw-0123/md-to-pdf-cli:0.1`.
+
+By default the output PDF is owned by `root` (the container user). To have it owned
+by you, add `--user "$(id -u):$(id -g)"`:
+
+```bash
+docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli report.md
+```
+
+Build it yourself instead of pulling:
+
+```bash
+docker build -t md2pdf .
+docker run --rm -v "$PWD:/work" md2pdf report.md
+```
 
 > **TODO**: Automatically download Chromium on the first run to remove this manual step.
 
@@ -175,8 +214,11 @@ diagrams to finish rendering before printing, so nothing comes out half-drawn.
 
 ## Troubleshooting
 
-- **`Chromium is not installed for Playwright`** — run `playwright install chromium`
-  (or `uv tool run --from md-to-pdf-cli playwright install chromium` for a uv-tool install).
+- **Chromium auto-download failed** — md2pdf normally downloads Chromium on first
+  run, but if that fails (no network, restricted environment, or you set
+  `MD2PDF_AUTO_INSTALL_BROWSER=0`) install it manually with `playwright install
+  chromium` (or `uv tool run --from md-to-pdf-cli playwright install chromium` for a
+  uv-tool install).
 - **Chinese/CJK text shows as boxes (tofu) on Linux** — install CJK fonts, e.g.
   `sudo apt install fonts-noto-cjk` on Debian/Ubuntu. Windows and macOS already
   ship with CJK fonts.
