@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 from playwright.sync_api import Error as PlaywrightError
 
@@ -203,3 +205,56 @@ def test_launch_reraises_unrelated_errors(monkeypatch):
 
     with pytest.raises(PlaywrightError):
         pdf_render._launch_chromium(_FakePlaywright(_BoomChromium()))
+
+
+class _FakeCompleted:
+    def __init__(self, returncode: int):
+        self.returncode = returncode
+
+
+_INSTALL_DEPS_CMD = [sys.executable, "-m", "playwright", "install-deps", "chromium"]
+
+
+def test_install_system_deps_prepends_sudo_for_non_root(monkeypatch):
+    """As a normal user, sudo wraps an absolute-interpreter command (survives PATH reset)."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr("os.geteuid", lambda: 1000, raising=False)
+    monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(
+        "subprocess.run", lambda cmd, check=False: calls.append(cmd) or _FakeCompleted(0)
+    )
+
+    assert pdf_render.install_system_deps() == 0
+    assert calls == [["sudo", *_INSTALL_DEPS_CMD]]
+
+
+def test_install_system_deps_no_sudo_when_root(monkeypatch):
+    """Already root (e.g. in a container): run install-deps directly, no sudo."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr("os.geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr(
+        "subprocess.run", lambda cmd, check=False: calls.append(cmd) or _FakeCompleted(0)
+    )
+
+    assert pdf_render.install_system_deps() == 0
+    assert calls == [_INSTALL_DEPS_CMD]  # no sudo prefix
+
+
+def test_install_system_deps_fails_clearly_without_sudo(monkeypatch):
+    """Non-root and no sudo: report it instead of running a doomed command."""
+    monkeypatch.setattr("os.geteuid", lambda: 1000, raising=False)
+    monkeypatch.setattr("shutil.which", lambda name: None)
+
+    def must_not_run(*a, **k):  # pragma: no cover - must not run
+        raise AssertionError("install-deps must not run when root is unreachable")
+
+    monkeypatch.setattr("subprocess.run", must_not_run)
+
+    assert pdf_render.install_system_deps() == 1
+
+
+def test_install_system_deps_propagates_exit_code(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 0, raising=False)
+    monkeypatch.setattr("subprocess.run", lambda cmd, check=False: _FakeCompleted(5))
+
+    assert pdf_render.install_system_deps() == 5
