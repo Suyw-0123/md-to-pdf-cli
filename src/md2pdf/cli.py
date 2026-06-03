@@ -23,7 +23,7 @@ from typer.core import TyperGroup
 from . import __version__
 from .config import Config, Margin, load_config
 from .converter import convert as convert_file
-from .pdf_render import BrowserNotInstalledError
+from .pdf_render import BrowserNotInstalledError, install_system_deps
 
 _console = Console()
 _err = Console(stderr=True)
@@ -324,6 +324,26 @@ def _print_config_help() -> None:
     _console.print("\n")
     _console.print("Full reference: [bold]md2pdf --help[/bold] and the Configuration wiki page.")
     _console.print("\n")
+
+
+@app.command("install-deps")
+def install_deps() -> None:
+    """Install the system libraries Chromium needs to run (Debian/Ubuntu; needs root).
+
+    A convenience wrapper around `playwright install-deps` that uses the right
+    interpreter and sudo for you, so a reset PATH under sudo can't break it. Run
+    this once if md2pdf reports missing shared libraries on Linux.
+    """
+    code = install_system_deps()
+    if code == 0:
+        _console.print("[green]✓[/green] system libraries installed — md2pdf is ready to go")
+    else:
+        _err.print(
+            "[red]install-deps failed.[/red] If you can't get root, run md2pdf via the "
+            "Docker image, which bundles everything:\n"
+            '    docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli your.md'
+        )
+    raise typer.Exit(code=code)
 
 
 if __name__ == "__main__":

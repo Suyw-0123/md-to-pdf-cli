@@ -92,9 +92,19 @@ Chromium 不是 pip 依賴，而是 Playwright 的瀏覽器二進位檔。為了
 會成功，但啟動會以 `error while loading shared libraries: libnspr4.so` 死掉。這兩種失敗
 需要不同的修法，所以 `_is_missing_deps_error()` 比對載入器錯誤（`error while loading
 shared libraries` / Playwright 自己的 `missing dependencies`），改拋 `_MISSING_DEPS_HINT`
-——指向 `sudo playwright install-deps chromium`（這些依賴需要 root，md2pdf 不會自己拿）
-或內建一切的 Docker image。關鍵是這個分支在自動安裝**之前**就先判斷，所以 md2pdf 絕不會
-因為主機缺 lib 而去重複下載一個其實已經存在的瀏覽器。
+——指向 `md2pdf install-deps` 命令（或內建一切的 Docker image）。關鍵是這個分支在自動安裝
+**之前**就先判斷，所以 md2pdf 絕不會因為主機缺 lib 而去重複下載一個其實已經存在的瀏覽器。
+
+### `md2pdf install-deps`
+
+裝系統函式庫需要 root，md2pdf 不會自己拿，所以它把指令交給使用者。但天真的提示
+（`sudo playwright install-deps`）是個陷阱：`sudo` 會重置 `PATH`，把擁有 `playwright`
+進入點的 venv / uv-tool 丟掉，於是噴 `sudo: playwright: command not found`。
+`install_system_deps()` 的解法是用**絕對路徑呼叫當前直譯器**——
+`sudo {sys.executable} -m playwright install-deps chromium`——這在 pip、uv、uv-tool、
+pipx 安裝下都解析得一致。只有在非 root 時才加 `sudo`（例如容器內已是 root 就略過），
+若需要 root 但機器上沒有 `sudo` 則以清楚訊息退出。CLI 命令只是包這個 helper 並回傳它的
+exit code。
 
 ## 生命週期
 

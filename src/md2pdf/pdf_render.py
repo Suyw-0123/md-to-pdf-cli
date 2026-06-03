@@ -9,6 +9,7 @@ broken diagrams" class of bugs.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -46,15 +47,15 @@ _INSTALL_HINT = (
 
 #: Shown when the browser binary is present but the OS lacks the shared libraries
 #: Chromium needs to launch (common on a fresh Debian/Ubuntu). These can't be
-#: installed without root, so we point at ``install-deps`` and the Docker image
-#: rather than pretend the download failed.
+#: installed without root, so we point at ``md2pdf install-deps`` (which wraps
+#: ``playwright install-deps`` with the right interpreter + sudo) and the Docker
+#: image rather than pretend the download failed. A bare ``sudo playwright
+#: install-deps`` would fail here because sudo resets PATH and drops the venv.
 _MISSING_DEPS_HINT = (
     "Chromium is installed, but this system is missing the shared libraries it "
     "needs to run (e.g. libnspr4, libnss3, libasound2).\n"
-    "Install them once (needs root) with:\n"
-    "    sudo playwright install-deps chromium\n"
-    "If you installed md2pdf as a uv tool:\n"
-    "    sudo uv tool run --from md-to-pdf-cli playwright install-deps chromium\n"
+    "Install them once (you'll be prompted for your sudo password):\n"
+    "    md2pdf install-deps\n"
     "No root access? Run md2pdf via the Docker image, which bundles everything:\n"
     '    docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli your.md'
 )
@@ -124,6 +125,39 @@ def _install_chromium() -> bool:
     except OSError:
         return False
     return result.returncode == 0
+
+
+def install_system_deps() -> int:
+    """Install the OS shared libraries Chromium needs (Debian/Ubuntu). Returns an exit code.
+
+    Wraps ``playwright install-deps chromium`` so the user gets one command that
+    actually works. We invoke the *current* interpreter by absolute path
+    (``sys.executable``), which is what makes it survive ``sudo``: a bare
+    ``sudo playwright`` fails because sudo resets PATH and drops the venv / uv-tool
+    that owns the ``playwright`` entry point, whereas an absolute interpreter path
+    resolves the same whether md2pdf was installed with pip, uv, uv-tool, or pipx.
+
+    Installing system libraries needs root, so we prefix ``sudo`` unless we're
+    already root. Returns the underlying command's exit code (non-zero on failure,
+    or if root is required but ``sudo`` isn't available).
+    """
+    cmd = [sys.executable, "-m", "playwright", "install-deps", "chromium"]
+    is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+    if not is_root:
+        if shutil.which("sudo") is None:
+            print(
+                "md2pdf: installing system libraries needs root, but 'sudo' isn't "
+                "available here. Re-run as root, or use the Docker image instead.",
+                file=sys.stderr,
+            )
+            return 1
+        cmd = ["sudo", *cmd]
+    print(f"md2pdf: running: {' '.join(cmd)}", file=sys.stderr, flush=True)
+    try:
+        return subprocess.run(cmd, check=False).returncode
+    except OSError as exc:
+        print(f"md2pdf: could not run install-deps: {exc}", file=sys.stderr)
+        return 1
 
 
 def _launch_chromium(playwright):

@@ -106,10 +106,23 @@ the launch dies with `error while loading shared libraries: libnspr4.so`. These
 two failures need different fixes, so `_is_missing_deps_error()` matches the
 loader error (`error while loading shared libraries` / Playwright's own
 `missing dependencies`) and raises with `_MISSING_DEPS_HINT` instead — pointing
-at `sudo playwright install-deps chromium` (the deps need root, which md2pdf
-won't take on its own) or the Docker image, which bundles everything. Crucially
-this branch is checked **before** auto-install, so md2pdf never re-downloads a
-browser that's already present just because the host is missing libs.
+at the `md2pdf install-deps` command (or the Docker image, which bundles
+everything). Crucially this branch is checked **before** auto-install, so md2pdf
+never re-downloads a browser that's already present just because the host is
+missing libs.
+
+### `md2pdf install-deps`
+
+Installing the host libraries needs root, which md2pdf won't take on its own —
+so it hands the user a command. The naive hint (`sudo playwright install-deps`)
+is a trap: `sudo` resets `PATH` and drops the venv / uv-tool that owns the
+`playwright` entry point, so it dies with `sudo: playwright: command not found`.
+`install_system_deps()` sidesteps this by invoking the **current interpreter by
+absolute path** — `sudo {sys.executable} -m playwright install-deps chromium` —
+which resolves identically under pip, uv, uv-tool, and pipx. It prepends `sudo`
+only when not already root (e.g. skips it inside the container), and bails with a
+clear message if root is required but `sudo` isn't on the box. The CLI command
+just wraps this helper and propagates its exit code.
 
 ## Lifecycle
 
