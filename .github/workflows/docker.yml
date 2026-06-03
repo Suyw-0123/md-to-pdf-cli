@@ -8,9 +8,11 @@ on:
   workflow_dispatch:
 
 env:
-  # Image name follows the PyPI package (md-to-pdf-cli), not the repo
-  # (markdown-to-pdf-cli), so `docker pull` matches `pip install`. The package is
-  # still linked to this repo via the OCI source label metadata-action adds.
+  # Repo, PyPI package, and GHCR image all share the name `md-to-pdf-cli`, so
+  # `docker pull` matches `pip install`. Pinned explicitly and lowercased (ghcr.io
+  # requires lowercase) rather than `${{ github.repository }}`, which carries the
+  # owner's original casing. The OCI source label metadata-action adds still links
+  # the image back to the repo.
   IMAGE: ghcr.io/suyw-0123/md-to-pdf-cli
 
 jobs:
