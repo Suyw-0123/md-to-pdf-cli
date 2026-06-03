@@ -60,7 +60,6 @@ docker build -t md2pdf .
 docker run --rm -v "$PWD:/work" md2pdf report.md
 ```
 
-> **TODO**: Automatically download Chromium on the first run to remove this manual step.
 
 ## Quick start
 

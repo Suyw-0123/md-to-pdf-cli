@@ -66,7 +66,8 @@ Ruff 設定（`pyproject.toml`）：line length 100、target `py312`、規則 `E
   需要 `permissions: id-token: write`。使用
   `--check-url https://pypi.org/simple/md-to-pdf-cli/`，讓重跑時跳過已上傳的檔案而非失敗。
 - **Docker**（`.github/workflows/docker.yml`）：觸發條件同 Publish。建置 `Dockerfile` 並推到
-  `ghcr.io/${{ github.repository }}`（即 `ghcr.io/suyw-0123/md-to-pdf-cli`）。tag 由
+  `ghcr.io/suyw-0123/md-to-pdf-cli`——image 名稱固定跟 PyPI 套件名一致（而非 repo 名
+  `markdown-to-pdf-cli`），讓 `docker pull` 與 `pip install` 對得上。tag 由
   `docker/metadata-action` 產生（`{{version}}`、`{{major}}.{{minor}}`，預設分支再加 `latest`）。
   需要 `permissions: packages: write`；認證用內建的 `GITHUB_TOKEN`，免管理 secret。首次推出的
   image 是 private——若要讓匿名 `docker pull`，到 repo 的 *Packages* 設定改為 public。
@@ -93,8 +94,8 @@ docker run --rm -v "$PWD:/work" md2pdf tests/fixtures/sample.md
 2. Commit 並 push。
 3. 建一個 `vX.Y.Z` GitHub Release → publish workflow 會上傳到 PyPI。
 
-PyPI trusted-publisher 設定必須與 repo 一致：owner `Suyw-0123`、repo `md-to-pdf-cli`、
-workflow `publish.yml`、environment 留空。
+PyPI trusted-publisher 設定必須與 repo 一致：owner `Suyw-0123`、repo `markdown-to-pdf-cli`
+（GitHub repo 名，*不是* PyPI 專案名 `md-to-pdf-cli`）、workflow `publish.yml`、environment 留空。
 
 ### 打包註記
 

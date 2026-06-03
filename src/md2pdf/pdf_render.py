@@ -44,14 +44,51 @@ _INSTALL_HINT = (
     "    uv tool run --from md-to-pdf-cli playwright install chromium"
 )
 
+#: Shown when the browser binary is present but the OS lacks the shared libraries
+#: Chromium needs to launch (common on a fresh Debian/Ubuntu). These can't be
+#: installed without root, so we point at ``install-deps`` and the Docker image
+#: rather than pretend the download failed.
+_MISSING_DEPS_HINT = (
+    "Chromium is installed, but this system is missing the shared libraries it "
+    "needs to run (e.g. libnspr4, libnss3, libasound2).\n"
+    "Install them once (needs root) with:\n"
+    "    sudo playwright install-deps chromium\n"
+    "If you installed md2pdf as a uv tool:\n"
+    "    sudo uv tool run --from md-to-pdf-cli playwright install-deps chromium\n"
+    "No root access? Run md2pdf via the Docker image, which bundles everything:\n"
+    '    docker run --rm -v "$PWD:/work" ghcr.io/suyw-0123/md-to-pdf-cli your.md'
+)
+
 
 class BrowserNotInstalledError(RuntimeError):
-    """Raised when the Chromium browser binary is missing and can't be installed."""
+    """Raised when Chromium can't be launched and md2pdf can't fix it automatically."""
 
 
 def _is_missing_browser_error(exc: PlaywrightError) -> bool:
     message = str(exc)
     return "Executable doesn't exist" in message or "playwright install" in message
+
+
+def _is_missing_deps_error(exc: PlaywrightError) -> bool:
+    """True when Chromium is present but the OS is missing shared libraries.
+
+    A fresh Debian/Ubuntu has the browser binary (after download) but not the
+    system libs it links against, so the launch dies with a loader error. This
+    is a different failure from a missing browser and needs a different fix.
+
+    Playwright surfaces this three ways, so we match on the most reliable signal:
+    the ``install-deps`` command it always recommends for host deps (whereas a
+    genuinely missing browser only ever recommends plain ``install``). The raw
+    glibc loader strings are matched too for the case where that error leaks
+    through unwrapped. Matching is case-insensitive — one variant reads
+    "Missing system dependencies", another "host system is missing dependencies".
+    """
+    message = str(exc).lower()
+    return (
+        "install-deps" in message
+        or "shared libraries" in message  # "error while loading shared libraries"
+        or "shared object file" in message  # "cannot open shared object file"
+    )
 
 
 def _auto_install_enabled() -> bool:
@@ -94,14 +131,22 @@ def _launch_chromium(playwright):
     try:
         return playwright.chromium.launch(args=args)
     except PlaywrightError as exc:
+        # Browser present but the OS lacks Chromium's shared libs — a download
+        # won't help, so surface the system-deps fix instead.
+        if _is_missing_deps_error(exc):
+            raise BrowserNotInstalledError(_MISSING_DEPS_HINT) from exc
         if not _is_missing_browser_error(exc):
             raise
         if not _auto_install_enabled() or not _install_chromium():
             raise BrowserNotInstalledError(_INSTALL_HINT) from exc
-        # Retry once now that the browser should be present.
+        # Retry once now that the browser should be present. The download can
+        # succeed yet the launch still fail for lack of system libs, so tell the
+        # two failures apart rather than always blaming the download.
         try:
             return playwright.chromium.launch(args=args)
         except PlaywrightError as retry_exc:
+            if _is_missing_deps_error(retry_exc):
+                raise BrowserNotInstalledError(_MISSING_DEPS_HINT) from retry_exc
             raise BrowserNotInstalledError(_INSTALL_HINT) from retry_exc
 
 

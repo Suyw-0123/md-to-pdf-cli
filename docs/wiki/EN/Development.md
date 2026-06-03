@@ -70,8 +70,9 @@ Where B904 ("raise from") applies, use `raise typer.Exit(code=1) from exc`.
   `--check-url https://pypi.org/simple/md-to-pdf-cli/` so re-runs skip
   already-uploaded files instead of failing.
 - **Docker** (`.github/workflows/docker.yml`): same triggers as Publish. Builds
-  the `Dockerfile` and pushes to `ghcr.io/${{ github.repository }}` (i.e.
-  `ghcr.io/suyw-0123/md-to-pdf-cli`). Tags come from `docker/metadata-action`
+  the `Dockerfile` and pushes to `ghcr.io/suyw-0123/md-to-pdf-cli` — the image
+  name is pinned to the PyPI package name (not the repo, `markdown-to-pdf-cli`)
+  so `docker pull` matches `pip install`. Tags come from `docker/metadata-action`
   (`{{version}}`, `{{major}}.{{minor}}`, and `latest` on the default branch).
   Needs `permissions: packages: write`; auth is the built-in `GITHUB_TOKEN`, no
   secret to manage. The first pushed image is private — make it public once under
@@ -101,7 +102,8 @@ docker run --rm -v "$PWD:/work" md2pdf tests/fixtures/sample.md
 3. Create a `vX.Y.Z` GitHub Release → the publish workflow uploads to PyPI.
 
 PyPI trusted-publisher config must match the repo: owner `Suyw-0123`, repo
-`md-to-pdf-cli`, workflow `publish.yml`, environment blank.
+`markdown-to-pdf-cli` (the GitHub repo name, *not* the PyPI project name
+`md-to-pdf-cli`), workflow `publish.yml`, environment blank.
 
 ### Packaging notes
 

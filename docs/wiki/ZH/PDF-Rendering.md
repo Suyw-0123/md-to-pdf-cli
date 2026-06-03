@@ -85,6 +85,17 @@ Chromium 不是 pip 依賴，而是 Playwright 的瀏覽器二進位檔。為了
 而非裸 traceback。提示使用已發布的套件名稱，所以 uv-tool 版本為
 `uv tool run --from md-to-pdf-cli playwright install chromium`。
 
+### 缺系統函式庫 vs. 缺瀏覽器
+
+`playwright install chromium` 只下載瀏覽器**二進位檔**，它**不會**安裝 Chromium 連結的
+系統共享函式庫（`libnspr4`、`libnss3`、`libasound2` …）。在全新的 Debian/Ubuntu 上，下載
+會成功，但啟動會以 `error while loading shared libraries: libnspr4.so` 死掉。這兩種失敗
+需要不同的修法，所以 `_is_missing_deps_error()` 比對載入器錯誤（`error while loading
+shared libraries` / Playwright 自己的 `missing dependencies`），改拋 `_MISSING_DEPS_HINT`
+——指向 `sudo playwright install-deps chromium`（這些依賴需要 root，md2pdf 不會自己拿）
+或內建一切的 Docker image。關鍵是這個分支在自動安裝**之前**就先判斷，所以 md2pdf 絕不會
+因為主機缺 lib 而去重複下載一個其實已經存在的瀏覽器。
+
 ## 生命週期
 
 瀏覽器一律在 `finally` 中關閉，暫存目錄由其 context manager 清掉，所以即使失敗也不會

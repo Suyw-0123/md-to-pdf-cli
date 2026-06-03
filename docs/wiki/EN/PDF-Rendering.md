@@ -97,6 +97,20 @@ is raised carrying `_INSTALL_HINT`, and the CLI prints that hint in yellow inste
 of a raw traceback. The hint uses the published package name, so the uv-tool
 variant reads `uv tool run --from md-to-pdf-cli playwright install chromium`.
 
+### Missing system libraries vs. missing browser
+
+`playwright install chromium` only downloads the browser **binary** — it does
+*not* install the OS shared libraries Chromium links against (`libnspr4`,
+`libnss3`, `libasound2`, …). On a fresh Debian/Ubuntu the download succeeds yet
+the launch dies with `error while loading shared libraries: libnspr4.so`. These
+two failures need different fixes, so `_is_missing_deps_error()` matches the
+loader error (`error while loading shared libraries` / Playwright's own
+`missing dependencies`) and raises with `_MISSING_DEPS_HINT` instead — pointing
+at `sudo playwright install-deps chromium` (the deps need root, which md2pdf
+won't take on its own) or the Docker image, which bundles everything. Crucially
+this branch is checked **before** auto-install, so md2pdf never re-downloads a
+browser that's already present just because the host is missing libs.
+
 ## Lifecycle
 
 The browser is always closed in a `finally`, and the temp directory is cleaned up

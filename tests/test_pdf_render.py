@@ -9,6 +9,35 @@ from md2pdf import pdf_render
 from md2pdf.pdf_render import BrowserNotInstalledError
 
 _MISSING_MSG = "Executable doesn't exist at /home/u/.cache/ms-playwright/chromium"
+# The raw glibc loader error, as it leaked through in the wild (Ubuntu 24.04).
+_MISSING_DEPS_MSG = (
+    "BrowserType.launch: Target page, context or browser has been closed\n"
+    "chrome-headless-shell: error while loading shared libraries: libnspr4.so: "
+    "cannot open shared object file: No such file or directory"
+)
+# Playwright's own host-deps message. Note it recommends `playwright install-deps`,
+# whose substring `playwright install` ALSO matches _is_missing_browser_error —
+# so deps detection must take precedence to avoid a pointless re-download.
+_HOST_DEPS_MSG = (
+    "Host system is missing dependencies to run browsers.\n    sudo playwright install-deps"
+)
+# Playwright's wrapped variant (capital M, "system" wedged in, no loader phrase):
+# only the `install-deps` signal saves it from being misread as a missing browser.
+_WRAPPED_DEPS_MSG = (
+    "Missing system dependencies required to run browser chromium. "
+    "Install them with: sudo npx playwright install-deps chromium"
+)
+
+
+class _DepsBrokenChromium:
+    """Browser is installed but the OS lacks the shared libs to launch it."""
+
+    def __init__(self):
+        self.launch_calls = 0
+
+    def launch(self, args=None):
+        self.launch_calls += 1
+        raise PlaywrightError(_MISSING_DEPS_MSG)
 
 
 class _FakeChromium:
@@ -56,6 +85,72 @@ def test_chromium_launch_args_no_sandbox(monkeypatch, value):
 def test_is_missing_browser_error_only_matches_install_errors():
     assert pdf_render._is_missing_browser_error(PlaywrightError(_MISSING_MSG))
     assert not pdf_render._is_missing_browser_error(PlaywrightError("Timeout 30000ms"))
+
+
+@pytest.mark.parametrize("msg", [_MISSING_DEPS_MSG, _HOST_DEPS_MSG, _WRAPPED_DEPS_MSG])
+def test_is_missing_deps_error_matches_all_playwright_wordings(msg):
+    assert pdf_render._is_missing_deps_error(PlaywrightError(msg))
+
+
+def test_is_missing_deps_error_ignores_unrelated_errors():
+    assert not pdf_render._is_missing_deps_error(PlaywrightError(_MISSING_MSG))
+    assert not pdf_render._is_missing_deps_error(PlaywrightError("Timeout 30000ms"))
+
+
+@pytest.mark.parametrize("msg", [_HOST_DEPS_MSG, _WRAPPED_DEPS_MSG])
+def test_host_deps_message_classified_as_deps_not_browser(monkeypatch, msg):
+    """A host-deps message also matches the browser pattern; deps must win."""
+    # Sanity: it really would trip the browser matcher if checked first.
+    assert pdf_render._is_missing_browser_error(PlaywrightError(msg))
+
+    class _Chromium:
+        def launch(self, args=None):
+            raise PlaywrightError(msg)
+
+    def fail_if_called() -> bool:  # pragma: no cover - must not run
+        raise AssertionError("must not re-download for a host-deps failure")
+
+    monkeypatch.setattr(pdf_render, "_install_chromium", fail_if_called)
+
+    with pytest.raises(BrowserNotInstalledError, match="install-deps"):
+        pdf_render._launch_chromium(_FakePlaywright(_Chromium()))
+
+
+def test_launch_reports_missing_deps_without_installing(monkeypatch):
+    """Browser present but libs missing: don't download, point at install-deps."""
+    chromium = _DepsBrokenChromium()
+
+    def fail_if_called() -> bool:  # pragma: no cover - must not run
+        raise AssertionError("auto-install should not run when the browser is present")
+
+    monkeypatch.setattr(pdf_render, "_install_chromium", fail_if_called)
+
+    with pytest.raises(BrowserNotInstalledError, match="install-deps"):
+        pdf_render._launch_chromium(_FakePlaywright(chromium))
+
+    assert chromium.launch_calls == 1  # no pointless retry
+
+
+def test_launch_reports_missing_deps_after_successful_download(monkeypatch):
+    """Download succeeds but the retry dies for lack of system libs."""
+
+    class _InstallsThenDepsFail:
+        def __init__(self):
+            self.launch_calls = 0
+
+        def launch(self, args=None):
+            self.launch_calls += 1
+            if self.launch_calls == 1:
+                raise PlaywrightError(_MISSING_MSG)  # first: browser missing
+            raise PlaywrightError(_MISSING_DEPS_MSG)  # retry: libs missing
+
+    chromium = _InstallsThenDepsFail()
+    monkeypatch.setattr(pdf_render, "_install_chromium", lambda: True)
+
+    with pytest.raises(BrowserNotInstalledError, match="install-deps"):
+        pdf_render._launch_chromium(_FakePlaywright(chromium))
+
+    assert chromium.launch_calls == 2  # initial miss + retry that hit the lib error
 
 
 def test_launch_installs_then_retries(monkeypatch):
