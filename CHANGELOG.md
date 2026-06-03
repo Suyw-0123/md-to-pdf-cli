@@ -11,6 +11,8 @@ tracks changes from the next version onward.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-03
+
 ### Added
 - `md2pdf install-deps` command — installs the system shared libraries Chromium
   needs on Debian/Ubuntu by wrapping `playwright install-deps` with the current
@@ -22,3 +24,6 @@ tracks changes from the next version onward.
   `command not found` for venv and uv-tool installs because `sudo` resets `PATH`.
   The hint now points at the new `md2pdf install-deps` command, which resolves the
   interpreter by absolute path and survives `sudo`.
+
+[Unreleased]: https://github.com/Suyw-0123/md-to-pdf-cli/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/Suyw-0123/md-to-pdf-cli/compare/v0.1.4...v0.1.5
